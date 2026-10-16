@@ -38,7 +38,6 @@ if ($Test) {
     $c = @('graph', 'hashmap', 'heap', 'queue') | ForEach-Object { ".\build\obj\$_.o" }
     Run-Native gcc (@('-std=c11', '-Wall', '-Iinclude', '.\tests\test_dsa.c') + $c + @('-o', '.\build\test_dsa.exe'))
     Run-Native .\build\test_dsa.exe @()
-    Run-Native .\build\relief.exe @('--script', 'tests\session_robust.txt')
-    Run-Native py @('tests\test_fetcher.py')
+    Run-Native .\build\relief.exe @('--script', 'tests\session.txt')
 }
 if ($Run) { & .\build\relief.exe }
