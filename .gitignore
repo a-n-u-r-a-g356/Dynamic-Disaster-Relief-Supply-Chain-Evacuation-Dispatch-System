@@ -1,0 +1,11 @@
+
+# Compiled object files
+*.o
+*.exe
+
+# Build folder
+build/
+
+# IDE settings
+.vscode/
+.idea/
