@@ -1,0 +1,23 @@
+# End-to-end scripted session: ./relief --script tests/session.txt
+# Uses manual weather so it works offline.
+weather clear
+weather set Z1 6 80
+weather set Z2 4 60
+weather set Z4 8 90
+assess
+dispatch
+evacuate
+# a road washes out -> routes change
+block D1 Z1
+route D1 Z1
+dispatch
+# heavy rain closes roads automatically (>= road.closeRainMmH)
+weather set Z4 45 120
+list roads
+# resources change
+vehicle B1 busy
+stock D1 100
+dispatch
+# new citizen report enters through the C queue
+report citizen Z5 4
+assess

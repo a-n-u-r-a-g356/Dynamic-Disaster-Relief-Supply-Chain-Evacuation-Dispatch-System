@@ -1,0 +1,6 @@
+id,type,home,capacity,speedKmh,available
+T1,TRUCK,D1,500,40,1
+T2,TRUCK,D2,500,40,1
+B1,BOAT,D1,120,15,1
+B2,BOAT,D1,120,15,1
+H1,HELI,D1,80,120,1

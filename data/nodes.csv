@@ -1,0 +1,10 @@
+id,type,name,lat,lon,population,floodDepthM,capacity,stock
+D1,DEPOT,Central_Depot,30.3165,78.0322,,,,4000
+D2,DEPOT,East_Depot,30.3030,78.0900,,,,1500
+Z1,ZONE,Rispana_Basti,30.3350,78.0600,9000,2.1,,
+Z2,ZONE,Bindal_Colony,30.3070,78.0180,6500,0.8,,
+Z3,ZONE,Clement_Town,30.2650,78.0030,4000,0.3,,
+Z4,ZONE,Premnagar,30.3340,77.9620,8000,1.4,,
+Z5,ZONE,Raipur,30.3100,78.0950,3000,0.1,,
+S1,SHELTER,Govt_School_Hall,30.3200,78.0450,,,2500,
+S2,SHELTER,Stadium_Camp,30.2900,78.0500,,,6000,
