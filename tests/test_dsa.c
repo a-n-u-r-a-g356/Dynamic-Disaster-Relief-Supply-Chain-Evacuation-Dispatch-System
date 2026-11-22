@@ -67,6 +67,9 @@ static void test_queue(void) {
     queue_push(q, &a); queue_push(q, &b);
     CHECK(queue_size(q) == 2 && queue_pop(q) == &a && queue_pop(q) == &b && queue_pop(q) == NULL);
     queue_free(q);
+    CHECK(queue_size(NULL) == 0);
+    CHECK(queue_pop(NULL) == NULL);
+    CHECK(!queue_push(NULL, &a));
 }
 
 int main(void) {
