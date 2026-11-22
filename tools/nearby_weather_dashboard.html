@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ResQNet — Location-Based Nearby Weather Monitor</title>
+<style>
+/* ─── Reset & Color Tokens ─────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0c141d; --surface: #141f2c; --card: #1b2a3b; --card-hover: #223449;
+  --border: #293d52; --border-highlight: #3c5977;
+  --text: #e2e8f0; --muted: #8b9eb3; --subtle: #566c82;
+  --accent: #2563eb; --accent-hover: #1d4ed8; --accent-light: #60a5fa;
+  --green: #10b981; --yellow: #f59e0b; --orange: #f97316; --red: #ef4444;
+  --radius: 12px; --shadow: 0 10px 30px rgba(0,0,0,0.4);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+body { background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+button { font-family: inherit; }
+
+/* ─── Layout ──────────────────────────────────────────────── */
+.container { max-width: 1240px; margin: 0 auto; padding: 20px 16px 40px; }
+
+/* ─── Header ──────────────────────────────────────────────── */
+.header {
+  background: linear-gradient(180deg, #162332 0%, var(--bg) 100%);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 0;
+  position: sticky; top: 0; z-index: 100;
+  backdrop-filter: blur(10px);
+}
+.header-inner {
+  max-width: 1240px; margin: 0 auto; padding: 0 16px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px;
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand-badge {
+  background: linear-gradient(135deg, #2563eb, #38bdf8);
+  color: #fff; font-weight: 800; font-size: 1.1rem;
+  width: 38px; height: 38px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 20px rgba(37,99,235,0.4);
+}
+.brand-text h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+.brand-text h1 span { color: var(--accent-light); }
+.brand-text .subtitle { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+.header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.btn {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 8px 16px; font-size: 0.88rem; font-weight: 500;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  transition: all 0.2s ease;
+}
+.btn:hover { background: var(--card); border-color: var(--border-highlight); }
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.btn-sm { padding: 6px 12px; font-size: 0.82rem; }
+
+.btn .spinner {
+  display: none; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+.btn.loading .spinner { display: inline-block; }
+.btn.loading .btn-label { display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.config-select {
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+  border-radius: 8px; padding: 7px 10px; font-size: 0.85rem; outline: none;
+}
+.config-select:focus { border-color: var(--accent); }
+
+/* ─── Status / Overview Bar ───────────────────────────────── */
+.status-bar {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px 22px; margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+}
+.location-meta { display: flex; align-items: center; gap: 12px; }
+.location-icon { font-size: 1.8rem; }
+.location-name { font-size: 1.25rem; font-weight: 700; color: #fff; }
+.location-sub { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+
+.status-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.risk-indicator-pill {
+  padding: 8px 20px; border-radius: 30px; font-weight: 700; font-size: 0.85rem;
+  letter-spacing: 0.04em; text-transform: uppercase; display: flex; align-items: center; gap: 6px;
+}
+.risk-pill-NORMAL   { background: rgba(16,185,129,0.15); color: var(--green);  border: 1px solid rgba(16,185,129,0.3); }
+.risk-pill-MODERATE { background: rgba(245,158,11,0.15); color: var(--yellow); border: 1px solid rgba(245,158,11,0.3); }
+.risk-pill-HIGH     { background: rgba(249,115,22,0.15); color: var(--orange); border: 1px solid rgba(249,115,22,0.3); }
+.risk-pill-CRITICAL { background: rgba(239,68,68,0.15);  color: var(--red);    border: 1px solid rgba(239,68,68,0.3); animation: pulse 2s infinite; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.timestamp-text { font-size: 0.78rem; color: var(--muted); text-align: right; }
+
+/* ─── Notification / Alert Bar ────────────────────────────── */
+.notification-banner {
+  padding: 12px 18px; border-radius: var(--radius); margin-bottom: 20px;
+  display: none; align-items: center; gap: 10px; font-size: 0.88rem;
+}
+.notification-banner.show { display: flex; }
+.notification-warning { background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); color: #fde68a; }
+.notification-error   { background: rgba(239,68,68,0.12);  border: 1px solid rgba(239,68,68,0.3);  color: #fca5a5; }
+
+/* ─── Grid & Section Titles ───────────────────────────────── */
+.section-heading {
+  font-size: 1.1rem; font-weight: 600; margin: 28px 0 14px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.section-heading .title-left { display: flex; align-items: center; gap: 8px; }
+.section-heading .badge-count {
+  background: var(--surface); color: var(--muted); font-size: 0.78rem;
+  padding: 2px 8px; border-radius: 12px; border: 1px solid var(--border);
+}
+
+.weather-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px;
+}
+
+/* ─── Weather Cards ───────────────────────────────────────── */
+.weather-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 22px; position: relative; transition: all 0.2s ease;
+  display: flex; flex-direction: column; justify-content: space-between;
+}
+.weather-card:hover {
+  background: var(--card-hover); border-color: var(--border-highlight);
+  transform: translateY(-2px); box-shadow: var(--shadow);
+}
+.weather-card.primary-card {
+  border-color: var(--accent); border-width: 2px;
+  background: linear-gradient(145deg, #1b2e44 0%, #172435 100%);
+}
+.primary-tag {
+  position: absolute; top: -11px; left: 20px;
+  background: var(--accent); color: #fff; font-size: 0.72rem; font-weight: 700;
+  text-transform: uppercase; padding: 2px 10px; border-radius: 10px; letter-spacing: 0.05em;
+}
+
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.card-location-name { font-size: 1.15rem; font-weight: 700; color: #fff; line-height: 1.3; }
+.card-location-meta { font-size: 0.8rem; color: var(--muted); margin-top: 3px; }
+.card-weather-icon { font-size: 2.6rem; line-height: 1; filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3)); }
+
+.card-temp-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.temp-value { font-size: 2.2rem; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+.temp-feels { font-size: 0.85rem; color: var(--muted); }
+.card-condition-text { font-size: 0.9rem; color: var(--text); font-weight: 500; margin-bottom: 16px; }
+
+.metrics-row {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px;
+}
+.metric-box {
+  background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 8px; padding: 10px 8px; text-align: center;
+}
+.metric-box .val { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.metric-box .lbl { font-size: 0.72rem; color: var(--muted); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.03em; }
+
+.risk-badges-container {
+  display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.06);
+}
+.risk-tag {
+  font-size: 0.73rem; font-weight: 600; padding: 3px 8px; border-radius: 6px;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.risk-tag-CRITICAL { background: rgba(239,68,68,0.2); color: #fca5a5; border: 1px solid rgba(239,68,68,0.4); }
+.risk-tag-HIGH     { background: rgba(249,115,22,0.2); color: #fdba74; border: 1px solid rgba(249,115,22,0.4); }
+.risk-tag-MODERATE { background: rgba(245,158,11,0.2); color: #fde68a; border: 1px solid rgba(245,158,11,0.4); }
+.risk-tag-NORMAL   { background: rgba(16,185,129,0.15); color: #86efac; border: 1px solid rgba(16,185,129,0.3); }
+
+/* ─── Thresholds & Legend Drawer ─────────────────────────── */
+.legend-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; margin-top: 30px;
+}
+.legend-header {
+  font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.threshold-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; font-size: 0.82rem;
+}
+.threshold-item {
+  background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 8px; padding: 12px;
+}
+.threshold-item h4 { font-size: 0.85rem; font-weight: 600; color: var(--accent-light); margin-bottom: 6px; }
+.threshold-row { display: flex; justify-content: space-between; color: var(--muted); margin-bottom: 2px; }
+.threshold-row span.val { color: var(--text); font-weight: 500; }
+
+/* ─── Disclaimer Banner ───────────────────────────────────── */
+.disclaimer-card {
+  background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.25); border-radius: var(--radius);
+  padding: 16px 20px; margin-top: 24px; font-size: 0.84rem; color: #fde68a;
+  display: flex; align-items: flex-start; gap: 12px; line-height: 1.6;
+}
+.disclaimer-card .disclaimer-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+
+/* ─── Location Prompt Modal / Box ─────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px;
+}
+.prompt-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  max-width: 540px; width: 100%; padding: 32px; box-shadow: var(--shadow);
+  text-align: center;
+}
+.prompt-icon { font-size: 3rem; margin-bottom: 14px; }
+.prompt-card h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 8px; color: #fff; }
+.prompt-card p { font-size: 0.9rem; color: var(--muted); line-height: 1.6; margin-bottom: 24px; }
+
+.search-box-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.text-input {
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  color: #fff; padding: 11px 14px; font-size: 0.92rem; width: 100%; outline: none;
+  transition: border-color 0.2s ease;
+}
+.text-input:focus { border-color: var(--accent); }
+
+.quick-cities {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 12px 0 20px;
+}
+.city-chip {
+  background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 20px;
+  color: var(--muted); font-size: 0.78rem; padding: 4px 10px; cursor: pointer; transition: all 0.2s ease;
+}
+.city-chip:hover { background: var(--card); color: var(--text); border-color: var(--accent); }
+
+.divider-text {
+  display: flex; align-items: center; text-align: center; color: var(--subtle);
+  font-size: 0.78rem; margin: 18px 0;
+}
+.divider-text::before, .divider-text::after { content: ''; flex: 1; border-bottom: 1px solid var(--border); }
+.divider-text span { padding: 0 10px; }
+
+.coords-row { display: flex; gap: 8px; margin-bottom: 12px; }
+
+.prompt-error {
+  background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3);
+  color: #fca5a5; font-size: 0.82rem; padding: 10px; border-radius: 8px;
+  margin-top: 14px; display: none; text-align: left;
+}
+
+/* ─── Skeleton Loading Cards ──────────────────────────────── */
+.skeleton {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  height: 250px; position: relative; overflow: hidden;
+}
+.skeleton::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.05), transparent);
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+
+/* ─── Responsive Media Queries ────────────────────────────── */
+@media (max-width: 768px) {
+  .header-inner { flex-direction: column; align-items: flex-start; }
+  .status-bar { flex-direction: column; align-items: flex-start; }
+  .status-right { width: 100%; justify-content: space-between; }
+  .coords-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── Global Header ──────────────────────────────────────── -->
+<header class="header">
+  <div class="header-inner">
+    <div class="brand">
+      <div class="brand-badge">RQ</div>
+      <div class="brand-text">
+        <h1>Res<span>Q</span>Net Weather</h1>
+        <div class="subtitle">Disaster-Management Nearby Monitoring</div>
+      </div>
+    </div>
+
+    <div class="header-controls" id="headerControls" style="display:none;">
+      <button class="btn btn-sm" onclick="openLocationModal()">📍 Change Location</button>
+
+      <label style="font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:4px;">
+        Radius:
+        <select class="config-select" id="radiusSelect" onchange="onRadiusChange()">
+          <option value="25">25 km</option>
+          <option value="50" selected>50 km</option>
+          <option value="75">75 km</option>
+          <option value="100">100 km</option>
+        </select>
+      </label>
+
+      <label style="font-size:0.8rem;color:var(--muted);display:flex;align-items:center;gap:4px;">
+        Auto-Refresh:
+        <select class="config-select" id="refreshIntervalSelect" onchange="onRefreshIntervalChange()">
+          <option value="5">5 min</option>
+          <option value="15" selected>15 min</option>
+          <option value="30">30 min</option>
+          <option value="0">Manual only</option>
+        </select>
+      </label>
+
+      <button class="btn btn-primary btn-sm" id="refreshBtn" onclick="fetchWeather()">
+        <span class="spinner"></span>
+        <span class="btn-label">🔄 Refresh</span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- ─── Main Content Container ─────────────────────────────── -->
+<main class="container">
+
+  <!-- Notification Banner (offline or error fallback) -->
+  <div class="notification-banner notification-warning" id="statusBanner">
+    <span>⚠️</span>
+    <span id="bannerText"></span>
+  </div>
+
+  <!-- Dashboard View -->
+  <div id="dashboardView" style="display:none;">
+
+    <!-- Top Status Bar -->
+    <div class="status-bar">
+      <div class="location-meta">
+        <div class="location-icon">📍</div>
+        <div>
+          <div class="location-name" id="locTitle">Detecting Location...</div>
+          <div class="location-sub" id="locSubtitle">Coordinates: —</div>
+        </div>
+      </div>
+
+      <div class="status-right">
+        <div class="risk-indicator-pill risk-pill-NORMAL" id="overallRiskPill">
+          <span>✅</span>
+          <span id="overallRiskText">NORMAL</span>
+        </div>
+        <div class="timestamp-text" id="updatedTimestamp">Updated: Just now</div>
+      </div>
+    </div>
+
+    <!-- Section 1: User Location -->
+    <div class="section-heading">
+      <div class="title-left">
+        <span>🏠 Primary Locality</span>
+        <span class="badge-count">Detected user position</span>
+      </div>
+    </div>
+    <div class="weather-grid" id="userLocationContainer"></div>
+
+    <!-- Section 2: Nearby Places -->
+    <div class="section-heading" id="nearbyHeading" style="margin-top:32px;">
+      <div class="title-left">
+        <span>🗺️ Nearby Populated Areas</span>
+        <span class="badge-count" id="nearbyCountBadge">0 found</span>
+      </div>
+      <div style="font-size:0.82rem;color:var(--muted);">Sorted by Haversine distance</div>
+    </div>
+    <div class="weather-grid" id="nearbyGrid"></div>
+
+    <!-- Section 3: Thresholds & Risk Indicators Legend -->
+    <div class="legend-card">
+      <div class="legend-header">
+        <span>📊 Disaster Risk Warning Thresholds (Configurable)</span>
+        <span style="font-size:0.75rem;color:var(--muted);">Automated rule-based indicators</span>
+      </div>
+      <div class="threshold-grid">
+        <div class="threshold-item">
+          <h4>🌧️ Heavy Rainfall (Current)</h4>
+          <div class="threshold-row"><span>Moderate:</span> <span class="val">&ge; 5.0 mm</span></div>
+          <div class="threshold-row"><span>High:</span> <span class="val">&ge; 15.0 mm</span></div>
+          <div class="threshold-row"><span>Critical:</span> <span class="val">&ge; 30.0 mm</span></div>
+        </div>
+        <div class="threshold-item">
+          <h4>💨 Strong Winds</h4>
+          <div class="threshold-row"><span>Moderate:</span> <span class="val">&ge; 40.0 km/h</span></div>
+          <div class="threshold-row"><span>High:</span> <span class="val">&ge; 60.0 km/h</span></div>
+          <div class="threshold-row"><span>Critical:</span> <span class="val">&ge; 90.0 km/h</span></div>
+        </div>
+        <div class="threshold-item">
+          <h4>⛈️ Thunderstorms (WMO)</h4>
+          <div class="threshold-row"><span>High:</span> <span class="val">WMO 95, 96 (Thunderstorm / Hail)</span></div>
+          <div class="threshold-row"><span>Critical:</span> <span class="val">WMO 99 (Severe Hail)</span></div>
+        </div>
+        <div class="threshold-item">
+          <h4>🌡️ Extreme Temperatures</h4>
+          <div class="threshold-row"><span>Heat Moderate:</span> <span class="val">&ge; 38°C</span> (Critical &ge; 45°C)</div>
+          <div class="threshold-row"><span>Cold Moderate:</span> <span class="val">&le; 5°C</span> (Critical &le; -5°C)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 4: Disaster-Management Disclaimer -->
+    <div class="disclaimer-card">
+      <div class="disclaimer-icon">⚠️</div>
+      <div>
+        <strong>Weather Observations vs. Verified Disaster Alerts:</strong>
+        The conditions and warning levels displayed above represent raw atmospheric measurements from Open-Meteo.
+        They are preliminary indicators designed to assist evacuation and logistics planning and do <em>not</em> represent
+        confirmed flood ground-truth or certified disaster warnings. Official warnings must always be corroborated
+        with state disaster response authorities (e.g. NDMA, IMD).
+      </div>
+    </div>
+
+  </div>
+</main>
+
+<!-- ─── Location Selection Modal ────────────────────────────── -->
+<div class="modal-overlay" id="locationModal">
+  <div class="prompt-card">
+    <div class="prompt-icon">📍</div>
+    <h2>Set Operational Location</h2>
+    <p>ResQNet dynamically discovers nearby cities, towns, and communities relative to your geographical coordinates.</p>
+
+    <!-- Option 1: Automatic Browser Geolocation -->
+    <button class="btn btn-primary" style="width:100%;padding:12px;font-size:0.95rem;justify-content:center;" onclick="requestBrowserGeolocation()">
+      🎯 Use Browser Geolocation (Auto-detect)
+    </button>
+
+    <div class="divider-text"><span>OR SEARCH BY NAME</span></div>
+
+    <!-- Option 2: Search City / Town -->
+    <div class="search-box-row">
+      <input type="text" class="text-input" id="citySearchInput" placeholder="Enter city or town (e.g. Dehradun, Delhi, Mumbai)..." onkeydown="if(event.key==='Enter') searchPlaceByName()">
+      <button class="btn" onclick="searchPlaceByName()">🔍 Search</button>
+    </div>
+
+    <!-- Quick preset chips -->
+    <div class="quick-cities">
+      <span class="city-chip" onclick="selectPreset('Dehradun', 30.3165, 78.0322)">Dehradun</span>
+      <span class="city-chip" onclick="selectPreset('New Delhi', 28.6139, 77.2090)">New Delhi</span>
+      <span class="city-chip" onclick="selectPreset('Mumbai', 19.0760, 72.8777)">Mumbai</span>
+      <span class="city-chip" onclick="selectPreset('Kolkata', 22.5726, 88.3639)">Kolkata</span>
+      <span class="city-chip" onclick="selectPreset('Bengaluru', 12.9716, 77.5946)">Bengaluru</span>
+      <span class="city-chip" onclick="selectPreset('Shimla', 31.1048, 77.1734)">Shimla</span>
+    </div>
+
+    <div class="divider-text"><span>OR ENTER LATITUDE & LONGITUDE</span></div>
+
+    <!-- Option 3: Manual Lat / Lon -->
+    <div class="coords-row">
+      <input type="number" step="any" class="text-input" id="manualLatInput" placeholder="Latitude (-90 to 90)">
+      <input type="number" step="any" class="text-input" id="manualLonInput" placeholder="Longitude (-180 to 180)">
+    </div>
+    <button class="btn" style="width:100%;justify-content:center;" onclick="applyManualCoordinates()">
+      Apply Coordinates
+    </button>
+
+    <div class="prompt-error" id="modalError"></div>
+  </div>
+</div>
+
+<script>
+// ─── Application State ──────────────────────────────────────
+const API_URL = '/api/weather';
+const SEARCH_API_URL = '/api/search';
+
+let state = {
+  lat: null,
+  lon: null,
+  radiusKm: 50,
+  autoRefreshMinutes: 15,
+  refreshTimerId: null,
+  lastSuccessfulData: null,
+  isFetching: false
+};
+
+// ─── Initialization ─────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // If browser supports geolocation, attempt initial request
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        state.lat = pos.coords.latitude;
+        state.lon = pos.coords.longitude;
+        closeLocationModal();
+        fetchWeather();
+      },
+      () => {
+        // Permission denied or unavailable — keep modal open for manual selection
+        openLocationModal();
+      },
+      { timeout: 6000, maximumAge: 300000 }
+    );
+  } else {
+    openLocationModal();
+  }
+});
+
+// ─── Modal Management ───────────────────────────────────────
+function openLocationModal() {
+  document.getElementById('locationModal').style.display = 'flex';
+  document.getElementById('modalError').style.display = 'none';
+}
+function closeLocationModal() {
+  document.getElementById('locationModal').style.display = 'none';
+  document.getElementById('dashboardView').style.display = 'block';
+  document.getElementById('headerControls').style.display = 'flex';
+}
+function showModalError(msg) {
+  const el = document.getElementById('modalError');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// ─── Geolocation & Location Selection Handlers ──────────────
+function requestBrowserGeolocation() {
+  if (!navigator.geolocation) {
+    showModalError('Browser geolocation is not supported on this device. Please search or enter coordinates.');
+    return;
+  }
+  showModalError('Requesting position...');
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      state.lat = pos.coords.latitude;
+      state.lon = pos.coords.longitude;
+      closeLocationModal();
+      fetchWeather();
+    },
+    (err) => {
+      const errMap = {
+        1: 'Location permission was denied. Please search by city name or enter coordinates below.',
+        2: 'Position is currently unavailable from your device. Please enter coordinates manually.',
+        3: 'Geolocation request timed out. Please try again or search manually.'
+      };
+      showModalError(errMap[err.code] || 'Could not retrieve geolocation: ' + err.message);
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 120000 }
+  );
+}
+
+async function searchPlaceByName() {
+  const q = document.getElementById('citySearchInput').value.trim();
+  if (!q) {
+    showModalError('Please enter a city or town name to search.');
+    return;
+  }
+  showModalError('Searching for "' + q + '"...');
+
+  try {
+    const res = await fetch(SEARCH_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q })
+    });
+    const data = await res.json();
+    if (data.status === 'ok' && data.results && data.results.length > 0) {
+      const best = data.results[0];
+      state.lat = best.lat;
+      state.lon = best.lon;
+      closeLocationModal();
+      fetchWeather();
+    } else {
+      showModalError('No matching places found for "' + q + '". Please check spelling or enter coordinates.');
+    }
+  } catch (e) {
+    showModalError('Search failed: ' + e.message);
+  }
+}
+
+function selectPreset(name, lat, lon) {
+  state.lat = lat;
+  state.lon = lon;
+  closeLocationModal();
+  fetchWeather();
+}
+
+function applyManualCoordinates() {
+  const lat = parseFloat(document.getElementById('manualLatInput').value);
+  const lon = parseFloat(document.getElementById('manualLonInput').value);
+  if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+    showModalError('Invalid coordinates. Latitude must be between -90 and 90, Longitude between -180 and 180.');
+    return;
+  }
+  state.lat = lat;
+  state.lon = lon;
+  closeLocationModal();
+  fetchWeather();
+}
+
+// ─── Settings Controls ─────────────────────────────────────
+function onRadiusChange() {
+  state.radiusKm = parseInt(document.getElementById('radiusSelect').value, 10);
+  fetchWeather();
+}
+
+function onRefreshIntervalChange() {
+  state.autoRefreshMinutes = parseInt(document.getElementById('refreshIntervalSelect').value, 10);
+  setupAutoRefresh();
+}
+
+function setupAutoRefresh() {
+  if (state.refreshTimerId) clearInterval(state.refreshTimerId);
+  if (state.autoRefreshMinutes > 0) {
+    state.refreshTimerId = setInterval(() => {
+      fetchWeather(true);
+    }, state.autoRefreshMinutes * 60 * 1000);
+  }
+}
+
+// ─── Data Fetching ─────────────────────────────────────────
+async function fetchWeather(isSilent = false) {
+  if (state.lat == null || state.lon == null) return;
+  if (state.isFetching) return;
+
+  state.isFetching = true;
+  const btn = document.getElementById('refreshBtn');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  if (!isSilent && !state.lastSuccessfulData) {
+    renderSkeletons();
+  }
+
+  try {
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        lat: state.lat,
+        lon: state.lon,
+        radius_km: state.radiusKm
+      })
+    });
+
+    const data = await res.json();
+    if (data.status === 'ok') {
+      state.lastSuccessfulData = data;
+      hideNotification();
+      renderDashboard(data);
+    } else {
+      showNotification('Server response: ' + (data.message || 'Error retrieving weather data.'));
+      if (state.lastSuccessfulData) renderDashboard(state.lastSuccessfulData);
+    }
+  } catch (err) {
+    showNotification('Network/API error: ' + err.message + '. Displaying cached data where available.');
+    if (state.lastSuccessfulData) renderDashboard(state.lastSuccessfulData);
+  } finally {
+    state.isFetching = false;
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
+
+function showNotification(msg) {
+  const banner = document.getElementById('statusBanner');
+  document.getElementById('bannerText').textContent = msg;
+  banner.classList.add('show');
+}
+function hideNotification() {
+  document.getElementById('statusBanner').classList.remove('show');
+}
+
+// ─── Render Dashboard ──────────────────────────────────────
+function renderDashboard(data) {
+  const loc = data.user_location || {};
+  document.getElementById('locTitle').textContent = loc.display || loc.name || 'Current Position';
+  document.getElementById('locSubtitle').textContent =
+    `Coordinates: ${(loc.lat || state.lat).toFixed(4)}°N, ${(loc.lon || state.lon).toFixed(4)}°E · Scan Radius: ${data.radius_km || state.radiusKm} km`;
+
+  // Overall risk pill
+  const pill = document.getElementById('overallRiskPill');
+  const risk = data.overall_risk_level || 'NORMAL';
+  pill.className = 'risk-indicator-pill risk-pill-' + risk;
+  const icons = { NORMAL: '✅', MODERATE: '🟠', HIGH: '🟡', CRITICAL: '🔴' };
+  document.getElementById('overallRiskText').textContent = `${icons[risk] || '❓'} ${risk} RISK`;
+
+  // Updated timestamp
+  document.getElementById('updatedTimestamp').textContent = 'Updated: ' + (data.timestamp || 'Just now');
+
+  // Render Primary User Location
+  const userContainer = document.getElementById('userLocationContainer');
+  if (data.user_weather) {
+    userContainer.innerHTML = buildCardHtml({
+      name: loc.display || loc.name || 'Your Location',
+      meta: 'Primary coordinates · 0.0 km',
+      weather: data.user_weather,
+      isPrimary: true
+    });
+  } else {
+    userContainer.innerHTML = `<div class="weather-card primary-card"><p style="color:var(--muted)">Weather observation unavailable for this coordinate.</p></div>`;
+  }
+
+  // Render Nearby Locations
+  const nearby = data.nearby || [];
+  const nearbyGrid = document.getElementById('nearbyGrid');
+  document.getElementById('nearbyCountBadge').textContent = `${nearby.length} detected within ${data.radius_km || state.radiusKm} km`;
+
+  if (nearby.length > 0) {
+    nearbyGrid.innerHTML = nearby.map(place => {
+      return buildCardHtml({
+        name: place.name,
+        meta: `${place.distance_km} km away · ${capitalize(place.type || 'place')}`,
+        weather: place.weather,
+        isPrimary: false
+      });
+    }).join('');
+  } else {
+    nearbyGrid.innerHTML = `
+      <div class="weather-card" style="grid-column: 1 / -1; text-align:center; padding: 36px;">
+        <div style="font-size:2rem;margin-bottom:8px;">🗺️</div>
+        <div style="font-weight:600;font-size:1.05rem;">No populated places found within ${data.radius_km || state.radiusKm} km</div>
+        <div style="color:var(--muted);font-size:0.85rem;margin-top:4px;">Try increasing the search radius using the dropdown above.</div>
+      </div>
+    `;
+  }
+
+  setupAutoRefresh();
+}
+
+function buildCardHtml({ name, meta, weather, isPrimary }) {
+  if (!weather) {
+    return `
+      <div class="weather-card ${isPrimary ? 'primary-card' : ''}">
+        ${isPrimary ? '<div class="primary-tag">Your Location</div>' : ''}
+        <div class="card-top">
+          <div>
+            <div class="card-location-name">${escapeHtml(name)}</div>
+            <div class="card-location-meta">${escapeHtml(meta)}</div>
+          </div>
+          <div class="card-weather-icon">❓</div>
+        </div>
+        <p style="color:var(--muted);margin-top:16px;">Weather data currently unavailable</p>
+      </div>
+    `;
+  }
+
+  const w = weather;
+  const dayNight = w.is_day ? '☀️ Daytime' : '🌙 Nighttime';
+
+  const riskTags = (w.risks || [])
+    .filter(r => r.level !== 'NORMAL')
+    .map(r => `<span class="risk-tag risk-tag-${r.level}">${riskEmoji(r.level)} ${r.type}: ${r.value}</span>`)
+    .join('');
+
+  return `
+    <div class="weather-card ${isPrimary ? 'primary-card' : ''}">
+      ${isPrimary ? '<div class="primary-tag">Your Location</div>' : ''}
+      <div class="card-top">
+        <div>
+          <div class="card-location-name">${escapeHtml(name)}</div>
+          <div class="card-location-meta">${escapeHtml(meta)}</div>
+        </div>
+        <div class="card-weather-icon">${w.icon || '☀️'}</div>
+      </div>
+
+      <div class="card-temp-row">
+        <span class="temp-value">${formatNum(w.temperature)}°C</span>
+        <span class="temp-feels">Feels like ${formatNum(w.feels_like)}°C</span>
+      </div>
+
+      <div class="card-condition-text">
+        ${escapeHtml(w.condition || 'Clear')} · <span style="color:var(--muted);font-weight:400;">${dayNight}</span>
+      </div>
+
+      <div class="metrics-row">
+        <div class="metric-box">
+          <div class="val">💧 ${w.humidity != null ? w.humidity + '%' : '—'}</div>
+          <div class="lbl">Humidity</div>
+        </div>
+        <div class="metric-box">
+          <div class="val">🌧️ ${formatNum(w.precipitation)} mm</div>
+          <div class="lbl">Precipitation</div>
+        </div>
+        <div class="metric-box">
+          <div class="val">💨 ${formatNum(w.wind_speed)} km/h</div>
+          <div class="lbl">Wind Speed</div>
+        </div>
+      </div>
+
+      <div class="risk-badges-container">
+        ${riskTags || '<span class="risk-tag risk-tag-NORMAL">✅ Clear Weather</span>'}
+      </div>
+    </div>
+  `;
+}
+
+function renderSkeletons() {
+  document.getElementById('userLocationContainer').innerHTML = '<div class="skeleton"></div>';
+  document.getElementById('nearbyGrid').innerHTML = Array(6).fill('<div class="skeleton"></div>').join('');
+}
+
+// ─── Utility Helpers ───────────────────────────────────────
+function formatNum(v) { return v != null ? Number(v).toFixed(1) : '—'; }
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+function riskEmoji(level) {
+  return level === 'CRITICAL' ? '🔴' : level === 'HIGH' ? '🟡' : '🟠';
+}
+</script>
+</body>
+</html>
