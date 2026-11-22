@@ -47,6 +47,8 @@ static void test_graph(void) {
     graph_add_road(g, 0, 1, 4); graph_add_road(g, 0, 2, 1);
     graph_add_road(g, 2, 1, 2); graph_add_road(g, 1, 3, 5);
     CHECK(!graph_add_road(g, 0, 9, 1));
+    CHECK(!graph_add_road(g, 0, 1, -1));  // Reject negative road cost
+    CHECK(!graph_add_road(NULL, 0, 1, 1)); // Handle NULL graph
     double dist[5]; int prev[5], path[5];
     dijkstra(g, 0, dist, prev);
     CHECK(dist[1] == 3 && dist[3] == 8);
