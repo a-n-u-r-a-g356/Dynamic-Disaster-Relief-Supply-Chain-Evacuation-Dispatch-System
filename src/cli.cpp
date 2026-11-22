@@ -319,9 +319,17 @@ bool exec(Model &m, const Args &a) {
         else cout << "no open road route\n";
         return true;
     }
-    if (c == "watch" && a.size() >= 2) {
-        double minutes, cycles = 0;
-        if (!num(a[1], minutes) || minutes <= 0 || (a.size() > 2 && !num(a[2], cycles))) { cout << "usage: watch <minutes> [cycles]\n"; return true; }
+    if (c == "watch") {
+        double minutes = 15.0, cycles = 0;
+        if (a.size() >= 2) {
+            if (!num(a[1], minutes) || minutes <= 0 || (a.size() > 2 && !num(a[2], cycles))) {
+                cout << "usage: watch [minutes] [cycles] (e.g. watch 15 or watch 5 3)\n";
+                return true;
+            }
+        }
+        cout << "Automated monitoring started (interval: " << minutes << " min";
+        if (cycles > 0) cout << ", " << (int)cycles << " cycles";
+        cout << "). Press Ctrl+C to stop.\n";
         for (int i = 1; cycles == 0 || i <= (int)cycles; i++) {
             cout << "\n----- watch cycle " << i << " -----\n";
             refreshWeather(m);
@@ -381,14 +389,47 @@ void printMainMenu() {
          << "-------------------------------------------------------------\n";
 }
 
-void commandPrompt(Model &m, std::istream &in, const string &label) {
-    cout << "\n" << label << "\n"
-         << "Enter the command shown (or type BACK to return).\n"
-         << "Command: " << std::flush;
+void commandPrompt(Model &m, std::istream &in, const string &cmdPrefix, const string &hint, const string &defVal = "") {
+    cout << "\n" << hint << "\n";
+    if (!defVal.empty()) {
+        cout << "Press Enter for default [" << defVal << "], or type values (or BACK to return).\n";
+    } else {
+        cout << "Enter values below (or type BACK to return):\n";
+    }
+    cout << "Command input: " << std::flush;
     string line;
     if (!std::getline(in, line)) return;
-    if (util::upper(util::trim(line)) == "BACK") return;
-    executeLine(m, line);
+    line = util::trim(line);
+    if (line.empty()) {
+        if (!defVal.empty()) line = defVal;
+        else return;
+    }
+    if (util::upper(line) == "BACK") return;
+
+    // Strip accidental angle brackets like <15> or <Z1 10 50>
+    string clean;
+    for (char ch : line) {
+        if (ch != '<' && ch != '>') clean += ch;
+    }
+    clean = util::trim(clean);
+
+    // If user typed a literal placeholder name from help text, guide them
+    if (clean == "interval_minutes" || clean == "zoneId" || clean == "people" || clean == "metres" || clean == "folder") {
+        cout << "Notice: '" << clean << "' is a placeholder. Please enter actual values (e.g. 15, Z1, or 1.5).\n";
+        return;
+    }
+
+    string fullCmd;
+    if (!cmdPrefix.empty()) {
+        if (clean == cmdPrefix || (clean.size() > cmdPrefix.size() && clean.compare(0, cmdPrefix.size(), cmdPrefix) == 0 && clean[cmdPrefix.size()] == ' ')) {
+            fullCmd = clean;
+        } else {
+            fullCmd = cmdPrefix + " " + clean;
+        }
+    } else {
+        fullCmd = clean;
+    }
+    executeLine(m, fullCmd);
 }
 
 void submenu(Model &m, std::istream &in, const string &title, const string &commands) {
@@ -406,32 +447,32 @@ void submenu(Model &m, std::istream &in, const string &title, const string &comm
         if (title == "WEATHER & REPORTS") {
             if (choice == "1") cmd = "weather fetch";
             else if (choice == "2") cmd = "weather show";
-            else if (choice == "3") commandPrompt(m, in, "Set rainfall for a zone: weather set <zoneId> <rainNow_mm_h> <rain24h_mm>");
-            else if (choice == "4") commandPrompt(m, in, "Add a sensor report: report sensor <zoneId>");
-            else if (choice == "5") commandPrompt(m, in, "Add a citizen report: report citizen <zoneId> <supporters>");
-            else if (choice == "6") commandPrompt(m, in, "Clear reports for a zone: report clear <zoneId>");
+            else if (choice == "3") commandPrompt(m, in, "weather set", "Set rainfall for a zone:\nEnter: <zoneId> <rainNow_mm_h> <rain24h_mm>\nExample: Z1 10.0 50.0");
+            else if (choice == "4") commandPrompt(m, in, "report sensor", "Submit sensor report:\nEnter zone ID (e.g. Z1):");
+            else if (choice == "5") commandPrompt(m, in, "report citizen", "Submit citizen report:\nEnter: <zoneId> <supporters>\nExample: Z4 3");
+            else if (choice == "6") commandPrompt(m, in, "report clear", "Clear zone reports:\nEnter zone ID to clear (e.g. Z1):");
             else if (choice == "7") cmd = "weather clear";
             else { cout << "Invalid option. Choose 0-7.\n"; continue; }
         } else if (title == "ZONES, DEPOTS & SHELTERS") {
-            if (choice == "1") commandPrompt(m, in, "add zone <id> <name> <lat> <lon> <population> <floodDepthM>");
-            else if (choice == "2") commandPrompt(m, in, "add depot <id> <name> <lat> <lon> <stock>");
-            else if (choice == "3") commandPrompt(m, in, "add shelter <id> <name> <lat> <lon> <capacity>");
-            else if (choice == "4") commandPrompt(m, in, "depth <zoneId> <metres>");
-            else if (choice == "5") commandPrompt(m, in, "population <zoneId> <people>");
+            if (choice == "1") commandPrompt(m, in, "add zone", "Add new disaster zone:\nEnter: <id> <name> <lat> <lon> <population> <floodDepthM>\nExample: Z6 Subhash_Nagar 30.27 77.99 5000 1.2");
+            else if (choice == "2") commandPrompt(m, in, "add depot", "Add relief depot:\nEnter: <id> <name> <lat> <lon> <stock>\nExample: D3 South_Depot 30.28 78.01 2000");
+            else if (choice == "3") commandPrompt(m, in, "add shelter", "Add evacuation shelter:\nEnter: <id> <name> <lat> <lon> <capacity>\nExample: S3 Community_Hall 30.30 78.02 1500");
+            else if (choice == "4") commandPrompt(m, in, "depth", "Update flood depth:\nEnter: <zoneId> <depth_in_metres>\nExample: Z1 1.8");
+            else if (choice == "5") commandPrompt(m, in, "population", "Update population:\nEnter: <zoneId> <people>\nExample: Z1 9500");
             else if (choice == "6") cmd = "list nodes";
             else { cout << "Invalid option. Choose 0-6.\n"; continue; }
         } else if (title == "VEHICLES & SUPPLIES") {
-            if (choice == "1") commandPrompt(m, in, "add vehicle <id> <truck|boat|heli> <depotId> <capacity> <speedKmh>");
-            else if (choice == "2") commandPrompt(m, in, "vehicle <id> free|busy");
-            else if (choice == "3") commandPrompt(m, in, "stock <depotId> <units>");
+            if (choice == "1") commandPrompt(m, in, "add vehicle", "Add vehicle to fleet:\nEnter: <id> <truck|boat|heli> <depotId> <capacity> <speedKmh>\nExample: T3 truck D1 600 45");
+            else if (choice == "2") commandPrompt(m, in, "vehicle", "Change vehicle availability:\nEnter: <id> <free|busy>\nExample: T1 busy");
+            else if (choice == "3") commandPrompt(m, in, "stock", "Update depot stock:\nEnter: <depotId> <units>\nExample: D1 5000");
             else if (choice == "4") cmd = "list vehicles";
             else { cout << "Invalid option. Choose 0-4.\n"; continue; }
         } else if (title == "ROADS & ROUTES") {
-            if (choice == "1") commandPrompt(m, in, "add road <idA> <idB> <km>");
-            else if (choice == "2") commandPrompt(m, in, "remove road <idA> <idB>");
-            else if (choice == "3") commandPrompt(m, in, "block <idA> <idB>");
-            else if (choice == "4") commandPrompt(m, in, "unblock <idA> <idB>");
-            else if (choice == "5") commandPrompt(m, in, "route <idA> <idB>");
+            if (choice == "1") commandPrompt(m, in, "add road", "Add road link:\nEnter: <idA> <idB> <distance_km>\nExample: D1 Z4 7.5");
+            else if (choice == "2") commandPrompt(m, in, "remove road", "Remove road link:\nEnter: <idA> <idB>\nExample: D1 Z4");
+            else if (choice == "3") commandPrompt(m, in, "block", "Block road / bridge:\nEnter endpoints (e.g. D1 Z1):");
+            else if (choice == "4") commandPrompt(m, in, "unblock", "Reopen road / bridge:\nEnter endpoints (e.g. D1 Z1):");
+            else if (choice == "5") commandPrompt(m, in, "route", "Find shortest route:\nEnter origin and destination (e.g. D1 Z1):");
             else if (choice == "6") cmd = "list roads";
             else { cout << "Invalid option. Choose 0-6.\n"; continue; }
         } else if (title == "VIEW SYSTEM DATA") {
@@ -444,8 +485,8 @@ void submenu(Model &m, std::istream &in, const string &title, const string &comm
         } else if (title == "SAVE / LOAD SCENARIO") {
             if (choice == "1") cmd = "save";
             else if (choice == "2") cmd = "load";
-            else if (choice == "3") commandPrompt(m, in, "Save to another folder: save <folder>");
-            else if (choice == "4") commandPrompt(m, in, "Load from another folder: load <folder>");
+            else if (choice == "3") commandPrompt(m, in, "save", "Save scenario to another folder:\nEnter folder path/name (e.g. backup_data):");
+            else if (choice == "4") commandPrompt(m, in, "load", "Load scenario from another folder:\nEnter folder path/name (e.g. backup_data):");
             else { cout << "Invalid option. Choose 0-4.\n"; continue; }
         }
         if (!cmd.empty()) executeLine(m, cmd);
@@ -462,7 +503,7 @@ int runMenu(Model &m, std::istream &in) {
         string choice;
         if (!std::getline(in, choice)) break;
         choice = util::trim(choice);
-        if (choice == "0") {
+        if (choice == "0" || util::upper(choice) == "EXIT") {
             cout << "Exiting ResQNet. Remember to save changes before exit.\n";
             break;
         }
@@ -482,7 +523,9 @@ int runMenu(Model &m, std::istream &in) {
             "  1. Nodes and zones\n  2. Roads\n  3. Vehicles\n  4. Reports\n  5. Configuration\n");
         else if (choice == "9") submenu(m, in, "SAVE / LOAD SCENARIO",
             "  1. Save current scenario\n  2. Reload current scenario\n  3. Save to another folder\n  4. Load from another folder\n");
-        else if (choice == "10") commandPrompt(m, in, "Run monitoring: watch <interval_minutes> [number_of_cycles]");
+        else if (choice == "10") {
+            commandPrompt(m, in, "watch", "Automated monitoring: refresh weather and re-run dispatch.\nEnter interval in minutes and optional cycles (e.g. '15' or '5 3'):", "15");
+        }
         else if (choice == "11") executeLine(m, "weather nearby");
         else if (choice == "12") {
             cout << "\nAdvanced command console. Type HELP for commands, BACK to return.\n";
@@ -493,8 +536,23 @@ int runMenu(Model &m, std::istream &in) {
                 if (util::upper(util::trim(line)) == "BACK") break;
                 if (!executeLine(m, line)) return 0;
             }
-        } else {
-            cout << "Invalid option. Please select a number from 0 to 12.\n";
+        } else if (!choice.empty()) {
+            // Also accept direct CLI commands at the main menu prompt
+            std::istringstream ss(choice);
+            string firstWord;
+            ss >> firstWord;
+            firstWord = util::upper(firstWord);
+            if (firstWord == "ASSESS" || firstWord == "DISPATCH" || firstWord == "EVACUATE" ||
+                firstWord == "WATCH" || firstWord == "WEATHER" || firstWord == "REPORT" ||
+                firstWord == "BLOCK" || firstWord == "UNBLOCK" || firstWord == "ROUTE" ||
+                firstWord == "LIST" || firstWord == "ADD" || firstWord == "SAVE" ||
+                firstWord == "LOAD" || firstWord == "DEPTH" || firstWord == "STOCK" ||
+                firstWord == "POPULATION" || firstWord == "VEHICLE" || firstWord == "CONFIG" ||
+                firstWord == "HELP") {
+                executeLine(m, choice);
+            } else {
+                cout << "Invalid option. Select 0 to 12, or type a command like 'assess', 'watch 15', 'help'.\n";
+            }
         }
     }
     return 0;
