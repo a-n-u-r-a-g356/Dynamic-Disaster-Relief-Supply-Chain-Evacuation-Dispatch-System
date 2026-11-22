@@ -14,13 +14,13 @@ using Args = std::vector<string>;
 
 namespace {
 
-const char *HELP = R"(Commands (ids have no spaces; use _ inside names):
+const char  *HELP = R"(Commands (ids have no spaces; use _ inside names):
   load [dir] | save [dir]                      read / write all CSV files
   list nodes|roads|vehicles|reports|config
   add zone <id> <name> <lat> <lon> <population> <floodDepthM>
   add depot <id> <name> <lat> <lon> <stock>
   add shelter <id> <name> <lat> <lon> <capacity>
-  add road <idA> <idB> <km>        remove road <idA> <idB>
+  add road <idA> <idB>  <km>        remove road <idA> <idB>
   add vehicle <id> <truck|boat|heli> <depotId> <capacity> <speedKmh>
   block <idA> <idB> | unblock <idA> <idB>      close / reopen a road
   depth <zoneId> <metres>                       update flood depth
