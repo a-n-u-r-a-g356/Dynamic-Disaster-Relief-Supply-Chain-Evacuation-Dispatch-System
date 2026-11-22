@@ -20,7 +20,7 @@ void Engine::refreshRoads(Model &m) {
 void Engine::assess(Model &m) {
     const Config &c = m.cfg;
     // Independent evidence combines as: confidence = 1 - product(1 - c_i)
-    std::unordered_map<std::string, double>  miss;
+    std::unordered_map<std::string, double> miss;
     for (const auto &r : m.reports.accepted()) {
         auto it = miss.emplace(r->zoneId(), 1.0).first;
         it->second *= 1.0 - r->confidence(c);

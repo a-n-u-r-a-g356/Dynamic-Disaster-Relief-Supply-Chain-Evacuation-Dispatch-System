@@ -34,7 +34,8 @@ public:
         // supplies and evacuation
         num_["supply.perPersonPerDay"] = 3; num_["supply.days"] = 1;
         num_["affect.fullDepth"] = 2.0; num_["evac.minScore"] = 40;
-       str_["weather.command"] = "py tools/fetch_weather.py";
+        str_["weather.command"] = "python tools/fetch_weather.py";
+        str_["weather.nearbyCommand"] = "python tools/nearby_weather.py";
     }
 
     bool load(const std::string &path) {
@@ -64,8 +65,14 @@ public:
         if (it == str_.end()) throw std::runtime_error("missing config key: " + key);
         return it->second;
     }
+    std::string getStrOr(const std::string &key, const std::string &fallback) const {
+        auto it = str_.find(key);
+        return it != str_.end() ? it->second : fallback;
+    }
     void set(const std::string &key, double v) { num_[key] = v; }
+    void setStr(const std::string &key, const std::string &v) { str_[key] = v; }
     bool has(const std::string &key) const { return num_.count(key) > 0; }
+    bool hasStr(const std::string &key) const { return str_.count(key) > 0; }
     const std::map<std::string, double> &numbers() const { return num_; }
     const std::map<std::string, std::string> &strings() const { return str_; }
 };
