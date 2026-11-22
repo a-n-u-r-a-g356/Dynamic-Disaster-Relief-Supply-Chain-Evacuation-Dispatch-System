@@ -106,3 +106,6 @@ your own area, or start empty with `./relief --data new_folder` and use the `add
 - Roads are undirected; vehicles do one trip per zone per run.
 - Weights, thresholds and trust values are tunable assumptions, not calibrated against real flood data.
 - Nodes cannot be deleted from the shell (edit the CSV instead).
+- ## Documentation
+
+This section provides additional information about the project structure.
