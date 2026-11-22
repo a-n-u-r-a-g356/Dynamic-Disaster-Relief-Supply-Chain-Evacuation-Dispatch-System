@@ -14,29 +14,57 @@ using Args = std::vector<string>;
 
 namespace {
 
-const char  *HELP = R"(Commands (ids have no spaces; use _ inside names):
-  load [dir] | save [dir]                      read / write all CSV files
-  list nodes|roads|vehicles|reports|config
+const char *HELP = R"(====================== RESQNET COMMAND HELP ======================
+Quick response workflow
+  assess                         Verify reports and rank zones by impact
+  dispatch                       Assign relief vehicles and supplies
+  evacuate                       Plan routes from affected zones to shelters
+  watch <minutes> [cycles]       Refresh weather and re-run dispatch
+
+Reports and weather
+  report sensor <zoneId>         Add a sensor report
+  report citizen <zoneId> <supporters>
+                                 Add a citizen report
+  report clear <zoneId>          Clear reports for a zone
+  weather fetch                  Fetch live rainfall for scenario zones
+  weather show                   Show current rainfall values
+  weather set <zoneId> <now> <24h>
+                                 Enter rainfall manually (mm/h, mm)
+  weather clear                  Clear rainfall values
+  weather nearby [lat lon] [--radius km]
+                                 Open nearby weather dashboard
+  weather nearby --cli <lat> <lon>
+                                 Show nearby weather in this console
+
+Scenario setup and resources
   add zone <id> <name> <lat> <lon> <population> <floodDepthM>
   add depot <id> <name> <lat> <lon> <stock>
   add shelter <id> <name> <lat> <lon> <capacity>
-  add road <idA> <idB>  <km>        remove road <idA> <idB>
+  add road <idA> <idB> <km>      Add a road between two nodes
+  remove road <idA> <idB>        Remove a road
   add vehicle <id> <truck|boat|heli> <depotId> <capacity> <speedKmh>
-  block <idA> <idB> | unblock <idA> <idB>      close / reopen a road
-  depth <zoneId> <metres>                       update flood depth
-  population <zoneId> <people>
-  stock <depotId> <units>
-  vehicle <id> free|busy                        change availability
-  report sensor <zoneId> | report citizen <zoneId> <supporters> | report clear <zoneId>
-  weather fetch                                 pull live rainfall from the internet
-  weather show | weather set <zoneId> <rainNow_mm_h> <rain24h_mm> | weather clear
-  config set <key> <number>
-  assess                                        confidence, impact score, level per zone
-  dispatch                                      supply + vehicle plan
-  evacuate                                      evacuation plan to shelters
-  route <idA> <idB>                             shortest open road route
-  watch <minutes> [cycles]                      refetch weather and re-dispatch repeatedly
-  help | quit)";
+  depth <zoneId> <metres>        Update flood depth
+  population <zoneId> <people>   Update zone population
+  stock <depotId> <units>        Update depot stock
+  vehicle <id> free|busy         Change vehicle availability
+
+Roads and routing
+  block <idA> <idB>              Close a road
+  unblock <idA> <idB>            Reopen a road
+  route <idA> <idB>              Find shortest open road route
+
+View, configure, and save
+  list nodes|roads|vehicles|reports|config
+  config set <key> <number>      Change a numeric setting
+  save [dir]                     Save scenario CSV files
+  load [dir]                     Load scenario CSV files
+
+Shell
+  help                           Show this command guide
+  quit                           Exit the console
+
+IDs and names cannot contain spaces; use underscores instead.
+==================================================================)";
 
 bool num(const string &s, double &d) { return util::toDouble(s, d); }
 
@@ -240,7 +268,34 @@ bool exec(Model &m, const Args &a) {
         } else if (a[1] == "clear") {
             for (int i : m.nodes.indicesOf<ZoneNode>()) { m.nodes.as<ZoneNode>(i)->rainNow = 0; m.nodes.as<ZoneNode>(i)->rain24h = 0; }
             cout << "weather cleared\n";
-        } else cout << "usage: weather fetch|show|set|clear\n";
+        } else if (a[1] == "nearby") {
+            // Launch the nearby weather monitoring dashboard or print CLI summary
+            string pyScript = m.cfg.getStrOr("weather.nearbyCommand", "python tools/nearby_weather.py");
+            if (a.size() >= 3 && a[2] == "--cli" && a.size() >= 5) {
+                // CLI mode: weather nearby --cli <lat> <lon> [--radius <km>]
+                string cmd = pyScript + " --cli " + a[3] + " " + a[4];
+                if (a.size() >= 7 && a[5] == "--radius") cmd += " --radius " + a[6];
+                cout << "Fetching nearby weather...\n";
+                std::system(cmd.c_str());
+            } else if (a.size() >= 4) {
+                // Dashboard with explicit coords: weather nearby <lat> <lon>
+                string port = "8765";
+                string cmd = pyScript + " --port " + port;
+                cout << "Starting Nearby Weather Dashboard...\n"
+                     << "Open http://127.0.0.1:" << port << " in your browser.\n"
+                     << "Press Ctrl+C to stop the server.\n";
+                std::system(cmd.c_str());
+            } else {
+                // Default dashboard: weather nearby
+                string port = "8765";
+                string cmd = pyScript + " --port " + port;
+                cout << "Starting Nearby Weather Dashboard...\n"
+                     << "Open http://127.0.0.1:" << port << " in your browser.\n"
+                     << "The dashboard will detect your location automatically.\n"
+                     << "Press Ctrl+C to stop the server.\n";
+                std::system(cmd.c_str());
+            }
+        } else cout << "usage: weather fetch|show|set|clear|nearby\n";
         return true;
     }
     if (c == "config" && a.size() == 4 && a[1] == "set") {
@@ -320,7 +375,8 @@ void printMainMenu() {
          << "  8. View system data\n"
          << "  9. Save / load scenario\n"
          << " 10. Automated monitoring (watch)\n"
-         << " 11. Advanced command console\n"
+         << " 11. Nearby weather monitor (web dashboard)\n"
+         << " 12. Advanced command console\n"
          << "  0. Exit\n"
          << "-------------------------------------------------------------\n";
 }
@@ -427,7 +483,8 @@ int runMenu(Model &m, std::istream &in) {
         else if (choice == "9") submenu(m, in, "SAVE / LOAD SCENARIO",
             "  1. Save current scenario\n  2. Reload current scenario\n  3. Save to another folder\n  4. Load from another folder\n");
         else if (choice == "10") commandPrompt(m, in, "Run monitoring: watch <interval_minutes> [number_of_cycles]");
-        else if (choice == "11") {
+        else if (choice == "11") executeLine(m, "weather nearby");
+        else if (choice == "12") {
             cout << "\nAdvanced command console. Type HELP for commands, BACK to return.\n";
             while (in.good()) {
                 cout << "resqnet> " << std::flush;
@@ -437,7 +494,7 @@ int runMenu(Model &m, std::istream &in) {
                 if (!executeLine(m, line)) return 0;
             }
         } else {
-            cout << "Invalid option. Please select a number from 0 to 11.\n";
+            cout << "Invalid option. Please select a number from 0 to 12.\n";
         }
     }
     return 0;
