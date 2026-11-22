@@ -106,6 +106,53 @@ your own area, or start empty with `./relief --data new_folder` and use the `add
 - Roads are undirected; vehicles do one trip per zone per run.
 - Weights, thresholds and trust values are tunable assumptions, not calibrated against real flood data.
 - Nodes cannot be deleted from the shell (edit the CSV instead).
-- ## Documentation
 
-This section provides additional information about the project structure.
+## Nearby weather monitor
+
+A location-based weather monitoring dashboard that works anywhere. It detects your position,
+discovers 5–6 nearby cities/towns, and shows live weather with disaster-risk indicators.
+
+### Quick start
+
+From the ResQNet menu choose **11. Nearby weather monitor**, or in the command console:
+
+```
+weather nearby                           # launches the web dashboard at http://127.0.0.1:8765
+weather nearby --cli 28.6139 77.2090     # print a text summary for Delhi (no browser needed)
+```
+
+Or run the Python script directly:
+
+```
+python tools/nearby_weather.py                                  # web dashboard
+python tools/nearby_weather.py --port 9000 --radius 80          # custom port & radius
+python tools/nearby_weather.py --cli 28.6139 77.2090            # CLI summary
+python tools/nearby_weather.py --cli 30.3165 78.0322 --radius 60  # CLI with custom radius
+```
+
+### How it works
+
+1. **Browser geolocation** or manual coordinate entry detects the user's position.
+2. **Reverse geocoding** (OSM Nominatim) names the location.
+3. **Nearby place discovery** (OSM Overpass API) finds 5–6 populated places within a configurable radius.
+4. **Live weather** (Open-Meteo API) retrieves temperature, humidity, wind, precipitation,
+   and weather codes for every location in a single batch request.
+5. **Haversine distance** (same formula as the C++ engine) sorts results by proximity.
+6. **Risk indicators** flag heavy rain, strong winds, thunderstorms, and extreme temperatures
+   at configurable thresholds (Normal / Moderate / High / Critical).
+7. **Auto-refresh** every 15 minutes; manual refresh button; 5-minute API response cache.
+
+All APIs are free and require no API key. Third-party usage policies are respected.
+
+### Risk indicator thresholds
+
+| Indicator | Moderate | High | Critical |
+|---|---|---|---|
+| Precipitation (mm) | ≥ 5 | ≥ 15 | ≥ 30 |
+| Wind speed (km/h) | ≥ 40 | ≥ 60 | ≥ 90 |
+| High temperature (°C) | ≥ 38 | ≥ 42 | ≥ 45 |
+| Low temperature (°C) | ≤ 5 | ≤ 0 | ≤ −5 |
+| Thunderstorm | — | WMO codes 95, 96 | WMO code 99 |
+
+> **Note:** These are weather-based observation indicators, NOT confirmed disaster alerts.
+> Always refer to official authorities (IMD, NDMA) for verified warnings.

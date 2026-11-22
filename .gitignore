@@ -1,7 +1,8 @@
-
-# Compiled object files
+# Compiled binaries and object files
 *.o
 *.exe
+ResQNet
+ResQNet_new
 
 # Build folder
 build/
@@ -9,3 +10,7 @@ build/
 # IDE settings
 .vscode/
 .idea/
+
+# Python cache
+__pycache__/
+*.pyc

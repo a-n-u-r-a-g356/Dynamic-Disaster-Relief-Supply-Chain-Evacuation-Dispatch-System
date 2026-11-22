@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 rm -rf build && mkdir -p build/obj
 for f in src/c/*.c; do gcc -std=c11 -Wall -Wextra -Iinclude -c "$f" -o "build/obj/$(basename "$f" .c).o"; done
 for f in src/*.cpp;  do g++ -std=c++17 -Wall -Wextra -Iinclude -Isrc -c "$f" -o "build/obj/$(basename "$f" .cpp).o"; done
-g++ -o build/relief  build/obj/*.o
+g++ -o build/relief build/obj/*.o
 echo "BUILD OK -> build/relief"
 if [ "$1" = "test" ]; then
     gcc -std=c11 -Wall -Iinclude tests/test_dsa.c build/obj/graph.o build/obj/hashmap.o build/obj/heap.o build/obj/queue.o -o build/test_dsa
