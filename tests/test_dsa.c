@@ -36,6 +36,9 @@ static void test_hashmap(void) {
     CHECK(hm_get(m, "id321", &v) && v == 321);
     CHECK(hm_put(m, "id321", 7) == 0 && hm_get(m, "id321", &v) && v == 7);
     CHECK(!hm_get(m, "nope", &v));
+    CHECK(hm_put(m, NULL, 10) == -1);
+    CHECK(!hm_get(m, NULL, &v));
+    CHECK(!hm_remove(m, NULL));
     CHECK(hm_remove(m, "id10") && !hm_get(m, "id10", &v) && !hm_remove(m, "id10"));
     CHECK(m->size == 499);
     hm_free(m);
