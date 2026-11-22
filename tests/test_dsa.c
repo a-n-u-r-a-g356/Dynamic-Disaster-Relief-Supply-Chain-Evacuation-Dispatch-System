@@ -26,6 +26,10 @@ static void test_heap(void) {
     for (int i = 0; i < 5; i++) heap_push_or_update(mn, i, 10 - i);
     CHECK(heap_pop(mn, &it) && it.id == 4);
     heap_free(mn);
+    CHECK(heap_empty(NULL));
+    CHECK(!heap_pop(NULL, &it));
+    CHECK(!heap_push_or_update(NULL, 1, 10));
+    CHECK(!heap_peek(NULL, &it));
 }
 
 static void test_hashmap(void) {
